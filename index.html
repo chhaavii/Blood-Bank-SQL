@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BloodBank.io — Blood Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --crimson:   #c0003c;
+  --red-glow:  #e8003f;
+  --red-dark:  #7a0025;
+  --red-mute:  #3d0015;
+  --black:     #080808;
+  --surface:   #111014;
+  --card:      #18161b;
+  --card2:     #1f1c24;
+  --border:    rgba(192,0,60,0.18);
+  --border2:   rgba(255,255,255,0.07);
+  --text:      #f0ecf5;
+  --muted:     #7a7486;
+  --safe:      #00c97a;
+  --warn:      #f0a800;
+  --danger:    #e8003f;
+  --info:      #3a9eff;
+  --font-head: 'Bebas Neue', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--black);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── Scanline overlay ─────────────────────────────── */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px);
+  pointer-events:none; z-index:9999;
+}
+
+/* ── Sidebar ──────────────────────────────────────── */
+.sidebar {
+  position: fixed; left:0; top:0; bottom:0; width:240px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  z-index: 100;
+  overflow-y: auto;
+}
+
+.sidebar-logo {
+  padding: 28px 24px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.logo-mark {
+  font-family: var(--font-head);
+  font-size: 28px;
+  letter-spacing: 2px;
+  color: var(--crimson);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo-mark span { color: var(--text); }
+.logo-sub {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.heartbeat {
+  display: inline-block;
+  animation: hb 1.4s ease-in-out infinite;
+}
+@keyframes hb {
+  0%,100% { transform: scale(1); }
+  14%      { transform: scale(1.3); }
+  28%      { transform: scale(1); }
+  42%      { transform: scale(1.15); }
+  56%      { transform: scale(1); }
+}
+
+.nav-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border2);
+}
+.nav-label {
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 20px 8px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all .2s;
+  font-size: 13.5px;
+  color: var(--muted);
+  position: relative;
+}
+.nav-item:hover { color: var(--text); background: rgba(192,0,60,0.06); }
+.nav-item.active { color: var(--text); border-left-color: var(--crimson); background: rgba(192,0,60,0.1); }
+.nav-item .icon { font-size:16px; width:20px; text-align:center; }
+.nav-badge {
+  margin-left: auto;
+  background: var(--crimson);
+  color: #fff;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border2);
+}
+.db-status {
+  display: flex; align-items:center; gap:8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.db-dot {
+  width: 7px; height:7px; border-radius:50%;
+  background: var(--safe);
+  box-shadow: 0 0 6px var(--safe);
+  animation: pulse 2s infinite;
+}
+.db-dot.err { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── Main ─────────────────────────────────────────── */
+.main {
+  margin-left: 240px;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+}
+
+.topbar {
+  display: flex; align-items: center;
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--border2);
+  background: rgba(8,8,8,0.8);
+  backdrop-filter: blur(12px);
+  position: sticky; top:0; z-index:50;
+  gap: 16px;
+}
+.page-title {
+  font-family: var(--font-head);
+  font-size: 22px;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+.topbar-right {
+  margin-left: auto;
+  display:flex; align-items:center; gap:12px;
+}
+.auto-refresh-btn {
+  font-size:11px; font-family: var(--font-mono);
+  padding:6px 14px; border-radius:4px;
+  border:1px solid var(--border);
+  background: transparent; color: var(--muted);
+  cursor:pointer; transition:.2s;
+  display:flex; align-items:center; gap:6px;
+}
+.auto-refresh-btn.on { border-color:var(--safe); color:var(--safe); }
+.auto-refresh-btn:hover { border-color:var(--crimson); color:var(--text); }
+
+.notif-btn {
+  width:36px; height:36px; border-radius:50%;
+  border: 1px solid var(--border);
+  background: transparent; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; position:relative;
+  transition:.2s;
+}
+.notif-btn:hover { border-color:var(--crimson); background:rgba(192,0,60,.1); }
+.notif-count {
+  position:absolute; top:-4px; right:-4px;
+  background:var(--crimson); color:#fff;
+  font-size:9px; font-family:var(--font-mono);
+  width:16px; height:16px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* ── Content ──────────────────────────────────────── */
+.content { padding: 32px; flex:1; }
+
+/* ── Stat Cards ───────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s, transform .2s;
+  cursor: default;
+}
+.stat-card:hover { border-color: var(--border); transform: translateY(-2px); }
+.stat-card::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, var(--crimson), transparent);
+}
+.stat-label {
+  font-size:10px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--muted);
+  margin-bottom:10px;
+}
+.stat-value {
+  font-family:var(--font-head);
+  font-size:40px; line-height:1;
+  color:var(--text);
+}
+.stat-value.red { color:var(--crimson); }
+.stat-value.green { color:var(--safe); }
+.stat-value.yellow { color:var(--warn); }
+.stat-icon {
+  position:absolute; right:16px; top:16px;
+  font-size:28px; opacity:.15;
+}
+
+/* ── Section ──────────────────────────────────────── */
+.section-header {
+  display:flex; align-items:center; gap:12px;
+  margin-bottom: 16px;
+}
+.section-title {
+  font-family: var(--font-head);
+  font-size: 20px;
+  letter-spacing: 2px;
+}
+.section-line {
+  flex:1; height:1px;
+  background: linear-gradient(90deg, var(--border), transparent);
+}
+
+/* ── Grid layout ──────────────────────────────────── */
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px; }
+.three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px; margin-bottom:24px; }
+.full-col { margin-bottom:24px; }
+
+/* ── Card ─────────────────────────────────────────── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 24px;
+}
+.card-title {
+  font-family:var(--font-head); font-size:16px; letter-spacing:1.5px;
+  color:var(--text); margin-bottom:16px;
+  display:flex; align-items:center; gap:8px;
+}
+
+/* ── Table ────────────────────────────────────────── */
+.table-wrap { overflow-x:auto; }
+table {
+  width:100%; border-collapse:collapse;
+  font-size:13px;
+}
+thead th {
+  text-align:left; padding:10px 12px;
+  font-size:9px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--muted);
+  border-bottom: 1px solid var(--border2);
+  font-weight:500;
+}
+tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background .15s;
+}
+tbody tr:hover { background: rgba(192,0,60,0.05); }
+tbody td { padding: 10px 12px; color:var(--text); }
+tbody td.mono { font-family:var(--font-mono); font-size:12px; }
+
+/* ── Blood group badge ─────────────────────────────── */
+.bg-badge {
+  display:inline-block;
+  padding:2px 8px; border-radius:4px;
+  font-family:var(--font-mono); font-size:12px; font-weight:600;
+  border: 1px solid;
+}
+.bg-A { color:#ff6b6b; border-color:#ff6b6b30; background:#ff6b6b15; }
+.bg-B { color:#4ecdc4; border-color:#4ecdc430; background:#4ecdc415; }
+.bg-O { color:#f9ca24; border-color:#f9ca2430; background:#f9ca2415; }
+.bg-AB { color:#a29bfe; border-color:#a29bfe30; background:#a29bfe15; }
+
+/* ── Status badge ─────────────────────────────────── */
+.badge {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 8px; border-radius:20px;
+  font-size:11px; font-weight:500;
+}
+.badge-available { background:rgba(0,201,122,.1); color:var(--safe); border:1px solid rgba(0,201,122,.2); }
+.badge-used { background:rgba(58,158,255,.1); color:var(--info); border:1px solid rgba(58,158,255,.2); }
+.badge-expired { background:rgba(232,0,63,.1); color:var(--danger); border:1px solid rgba(232,0,63,.2); }
+.badge-completed { background:rgba(0,201,122,.1); color:var(--safe); border:1px solid rgba(0,201,122,.2); }
+.badge-pending { background:rgba(240,168,0,.1); color:var(--warn); border:1px solid rgba(240,168,0,.2); }
+.badge-critical { background:rgba(232,0,63,.15); color:var(--danger); border:1px solid var(--danger); }
+.badge-low { background:rgba(240,168,0,.1); color:var(--warn); border:1px solid rgba(240,168,0,.2); }
+.badge-safe { background:rgba(0,201,122,.1); color:var(--safe); border:1px solid rgba(0,201,122,.2); }
+.badge-transit { background:rgba(58,158,255,.1); color:var(--info); border:1px solid rgba(58,158,255,.2); }
+.badge-delivered { background:rgba(0,201,122,.1); color:var(--safe); border:1px solid rgba(0,201,122,.2); }
+
+/* ── Priority ─────────────────────────────────────── */
+.priority-emergency { color:var(--danger); font-weight:600; }
+.priority-urgent { color:var(--warn); }
+.priority-normal { color:var(--safe); }
+
+/* ── Tier badges ──────────────────────────────────── */
+.tier { font-size:11px; padding:2px 8px; border-radius:3px; font-weight:600; }
+.tier-lifesaver { background:#ffd70020; color:#ffd700; border:1px solid #ffd70040; }
+.tier-hero { background:#e040fb20; color:#e040fb; border:1px solid #e040fb40; }
+.tier-regular { background:#00c97a20; color:#00c97a; border:1px solid #00c97a40; }
+.tier-new { background:#3a9eff20; color:#3a9eff; border:1px solid #3a9eff40; }
+.tier-none { background:#ffffff10; color:var(--muted); border:1px solid #ffffff20; }
+
+/* ── Form ─────────────────────────────────────────── */
+.form-grid { display:grid; gap:16px; }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.form-group { display:flex; flex-direction:column; gap:6px; }
+.form-label { font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+.form-input, .form-select {
+  background: var(--card2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color .2s;
+  width: 100%;
+}
+.form-input:focus, .form-select:focus { border-color: var(--crimson); }
+.form-select option { background: var(--card2); }
+
+/* ── Buttons ──────────────────────────────────────── */
+.btn {
+  padding:10px 24px; border-radius:6px;
+  font-family:var(--font-body); font-size:13px; font-weight:600;
+  cursor:pointer; border:none; transition:all .2s;
+  display:inline-flex; align-items:center; gap:8px;
+  letter-spacing:.5px;
+}
+.btn-primary {
+  background: var(--crimson);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(192,0,60,.3);
+}
+.btn-primary:hover { background:#e8003f; box-shadow:0 0 30px rgba(232,0,63,.5); transform:translateY(-1px); }
+.btn-primary:active { transform:translateY(0); }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.btn-outline:hover { border-color:var(--crimson); color:var(--text); }
+.btn-ghost {
+  background:transparent; border:none; color:var(--muted);
+  padding:8px 12px;
+}
+.btn-ghost:hover { color:var(--text); }
+.btn-warn {
+  background: rgba(240,168,0,0.15);
+  border: 1px solid rgba(240,168,0,0.3);
+  color: var(--warn);
+}
+.btn-warn:hover { background:rgba(240,168,0,0.25); }
+.btn-danger {
+  background: rgba(232,0,63,0.15);
+  border: 1px solid rgba(232,0,63,0.3);
+  color: var(--danger);
+}
+.btn-danger:hover { background:rgba(232,0,63,0.25); }
+.btn-sm { padding:6px 14px; font-size:12px; }
+.btn-full { width:100%; justify-content:center; }
+
+/* ── Toast ────────────────────────────────────────── */
+.toast-container {
+  position:fixed; bottom:24px; right:24px;
+  display:flex; flex-direction:column-reverse; gap:8px;
+  z-index:9998;
+}
+.toast {
+  min-width:280px; max-width:400px;
+  background:var(--card2);
+  border: 1px solid var(--border2);
+  border-radius:8px;
+  padding:14px 16px;
+  font-size:13px;
+  display:flex; align-items:flex-start; gap:10px;
+  animation: slideIn .3s ease;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+.toast.success { border-left: 3px solid var(--safe); }
+.toast.error   { border-left: 3px solid var(--danger); }
+.toast.warn    { border-left: 3px solid var(--warn); }
+.toast.info    { border-left: 3px solid var(--info); }
+@keyframes slideIn { from{transform:translateX(40px);opacity:0} to{transform:translateX(0);opacity:1} }
+.toast-icon { font-size:16px; margin-top:1px; }
+.toast-msg { flex:1; line-height:1.4; }
+.toast-close { cursor:pointer; color:var(--muted); font-size:16px; }
+
+/* ── Blood Group Chart Bars ─────────────────────────── */
+.bg-chart { display:flex; flex-direction:column; gap:10px; }
+.bg-row { display:flex; align-items:center; gap:12px; }
+.bg-label { width:36px; font-family:var(--font-mono); font-size:12px; font-weight:600; }
+.bg-bar-wrap { flex:1; background:rgba(255,255,255,0.05); border-radius:3px; height:20px; overflow:hidden; }
+.bg-bar { height:100%; border-radius:3px; transition:width .8s cubic-bezier(.4,0,.2,1); }
+.bg-count { width:40px; font-family:var(--font-mono); font-size:12px; color:var(--muted); text-align:right; }
+
+/* ── Stock heat ───────────────────────────────────── */
+.stock-heat { display:flex; flex-direction:column; gap:8px; }
+.stock-row { display:grid; grid-template-columns:130px 1fr; align-items:center; gap:12px; font-size:12px; }
+.stock-bank { color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.stock-groups { display:flex; gap:4px; flex-wrap:wrap; }
+.stock-chip {
+  width:36px; height:22px; border-radius:3px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-size:10px; font-weight:600;
+  cursor:default;
+}
+.stock-SAFE { background:#00c97a20; color:#00c97a; border:1px solid #00c97a30; }
+.stock-LOW { background:#f0a80020; color:#f0a800; border:1px solid #f0a80030; }
+.stock-CRITICAL { background:#e8003f20; color:#e8003f; border:1px solid #e8003f50; animation:blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── Compatibility matrix ─────────────────────────── */
+.compat-matrix { overflow-x:auto; }
+.compat-table { border-collapse:collapse; font-size:12px; }
+.compat-table th, .compat-table td {
+  width:48px; height:36px; text-align:center;
+  border: 1px solid rgba(255,255,255,0.06);
+  font-family:var(--font-mono);
+}
+.compat-table th { background:var(--card2); color:var(--muted); font-size:10px; }
+.compat-cell-yes { background:rgba(0,201,122,.15); color:#00c97a; font-weight:700; }
+.compat-cell-no  { background:rgba(232,0,63,.06); color:rgba(255,255,255,0.1); }
+
+/* ── Reward meter ─────────────────────────────────── */
+.reward-meter { 
+  background:var(--card2); border-radius:6px;
+  padding:12px 16px;
+  display:flex; align-items:center; gap:12px;
+}
+.reward-pts { font-family:var(--font-head); font-size:28px; color:var(--warn); }
+
+/* ── Notification item ─────────────────────────────── */
+.notif-item {
+  display:flex; gap:12px; align-items:flex-start;
+  padding:12px 0;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  font-size:13px;
+}
+.notif-dot { width:8px; height:8px; border-radius:50%; background:var(--crimson); margin-top:4px; flex-shrink:0; }
+.notif-msg { flex:1; color:var(--text); line-height:1.4; }
+.notif-time { font-size:10px; color:var(--muted); font-family:var(--font-mono); white-space:nowrap; }
+
+/* ── Expiry bar ─────────────────────────────────────── */
+.expiry-bar { height:3px; border-radius:2px; margin-top:4px; }
+
+/* ── Emergency pill ────────────────────────────────── */
+.priority-badge { 
+  display:inline-block; padding:2px 8px; border-radius:3px;
+  font-size:11px; font-weight:600; font-family:var(--font-mono);
+}
+.p-Critical { background:#e8003f25; color:#e8003f; border:1px solid #e8003f50; animation:blink 1s infinite; }
+.p-High { background:#f0a80020; color:#f0a800; border:1px solid #f0a80040; }
+.p-Medium { background:#3a9eff20; color:#3a9eff; border:1px solid #3a9eff40; }
+.p-Low { background:#00c97a20; color:#00c97a; border:1px solid #00c97a40; }
+
+/* ── ECG line ─────────────────────────────────────── */
+.ecg-wrap {
+  height:50px; overflow:hidden;
+  margin-bottom:20px;
+}
+.ecg-wrap svg { width:100%; height:50px; }
+.ecg-path {
+  fill:none; stroke:var(--crimson); stroke-width:1.5;
+  stroke-dasharray:600; stroke-dashoffset:0;
+  animation: ecgAnim 3s linear infinite;
+}
+@keyframes ecgAnim {
+  0% { stroke-dashoffset: 600; }
+  100% { stroke-dashoffset: 0; }
+}
+
+/* ── Modals ────────────────────────────────────────── */
+.modal-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.7); backdrop-filter:blur(4px);
+  z-index:500; align-items:center; justify-content:center;
+}
+.modal-overlay.open { display:flex; }
+.modal {
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:28px;
+  width:540px; max-width:95vw;
+  max-height:90vh; overflow-y:auto;
+  animation:modalIn .25s ease;
+}
+@keyframes modalIn { from{transform:scale(.95);opacity:0} to{transform:scale(1);opacity:1} }
+.modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.modal-title { font-family:var(--font-head); font-size:20px; letter-spacing:1.5px; }
+.modal-close { font-size:20px; cursor:pointer; color:var(--muted); background:none; border:none; }
+.modal-close:hover { color:var(--text); }
+
+/* ── Loading spinner ──────────────────────────────── */
+.spinner {
+  width:24px; height:24px; border-radius:50%;
+  border:2px solid var(--border);
+  border-top-color:var(--crimson);
+  animation: spin .7s linear infinite;
+  display:inline-block;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* ── Empty state ──────────────────────────────────── */
+.empty {
+  text-align:center; padding:40px;
+  color:var(--muted); font-size:13px;
+}
+.empty-icon { font-size:32px; margin-bottom:8px; }
+
+/* ── Scrollbar ────────────────────────────────────── */
+::-webkit-scrollbar { width:4px; height:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--red-dark); border-radius:2px; }
+
+/* ── Pages ────────────────────────────────────────── */
+.page { display:none; }
+.page.active { display:block; animation:fadeIn .25s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── Responsive ───────────────────────────────────── */
+@media(max-width:900px) {
+  .two-col, .three-col { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ SIDEBAR ═══════════════════════════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark"><span class="heartbeat">🩸</span> Blood<span>Bank</span></div>
+    <div class="logo-sub">Management System</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Overview</div>
+    <div class="nav-item active" onclick="goto('dashboard')">
+      <span class="icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="goto('notifications')">
+      <span class="icon">🔔</span> Notifications
+      <span class="nav-badge" id="notif-badge">0</span>
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Core</div>
+    <div class="nav-item" onclick="goto('donors')">
+      <span class="icon">🧑‍🤝‍🧑</span> Donors
+    </div>
+    <div class="nav-item" onclick="goto('donations')">
+      <span class="icon">💉</span> Donations
+    </div>
+    <div class="nav-item" onclick="goto('blood-units')">
+      <span class="icon">🩸</span> Blood Units
+    </div>
+    <div class="nav-item" onclick="goto('requests')">
+      <span class="icon">🏥</span> Blood Requests
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Facilities</div>
+    <div class="nav-item" onclick="goto('banks')">
+      <span class="icon">🏦</span> Blood Banks
+    </div>
+    <div class="nav-item" onclick="goto('hospitals')">
+      <span class="icon">🏨</span> Hospitals
+    </div>
+    <div class="nav-item" onclick="goto('staff')">
+      <span class="icon">👥</span> Staff
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Advanced</div>
+    <div class="nav-item" onclick="goto('procedures')">
+      <span class="icon">⚙️</span> Procedures
+    </div>
+    <div class="nav-item" onclick="goto('compatibility')">
+      <span class="icon">🧬</span> Compatibility
+    </div>
+    <div class="nav-item" onclick="goto('transport')">
+      <span class="icon">🚚</span> Transport
+    </div>
+    <div class="nav-item" onclick="goto('emergency')">
+      <span class="icon">🚨</span> Emergency
+    </div>
+    <div class="nav-item" onclick="goto('temperature')">
+      <span class="icon">🌡️</span> Temperature
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="db-status">
+      <div class="db-dot" id="db-dot"></div>
+      <span id="db-status-text">Connecting…</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ══ MAIN ════════════════════════════════════════════════════════════════════ -->
+<div class="main">
+  <div class="topbar">
+    <div class="page-title" id="page-title">DASHBOARD</div>
+    <div class="topbar-right">
+      <button class="auto-refresh-btn" id="auto-refresh-btn" onclick="toggleAutoRefresh()">
+        <span id="ar-icon">⏸</span> Auto Refresh
+      </button>
+      <button class="notif-btn" onclick="goto('notifications')">
+        🔔<span class="notif-count" id="notif-top">0</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ── DASHBOARD ───────────────────────────────────────────── -->
+    <div class="page active" id="page-dashboard">
+      <div class="ecg-wrap">
+        <svg viewBox="0 0 900 50" preserveAspectRatio="none">
+          <path class="ecg-path" d="M0,25 L60,25 L70,25 L80,5 L90,45 L100,25 L110,25 L130,25 L140,25 L150,5 L160,45 L170,25 L180,25 L260,25 L270,25 L280,5 L290,45 L300,25 L310,25 L390,25 L400,25 L410,5 L420,45 L430,25 L440,25 L520,25 L530,25 L540,5 L550,45 L560,25 L570,25 L650,25 L660,25 L670,5 L680,45 L690,25 L700,25 L780,25 L790,25 L800,5 L810,45 L820,25 L900,25"/>
+        </svg>
+      </div>
+
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Donors</div>
+          <div class="stat-value" id="s-donors"><div class="spinner"></div></div>
+          <div class="stat-icon">🧑‍🤝‍🧑</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Available Units</div>
+          <div class="stat-value red" id="s-units"><div class="spinner"></div></div>
+          <div class="stat-icon">🩸</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Requests</div>
+          <div class="stat-value" id="s-requests"><div class="spinner"></div></div>
+          <div class="stat-icon">📋</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pending</div>
+          <div class="stat-value yellow" id="s-pending"><div class="spinner"></div></div>
+          <div class="stat-icon">⏳</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Hospitals</div>
+          <div class="stat-value" id="s-hospitals"><div class="spinner"></div></div>
+          <div class="stat-icon">🏥</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Blood Banks</div>
+          <div class="stat-value" id="s-banks"><div class="spinner"></div></div>
+          <div class="stat-icon">🏦</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Expired Units</div>
+          <div class="stat-value red" id="s-expired"><div class="spinner"></div></div>
+          <div class="stat-icon">⚠️</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Notifications</div>
+          <div class="stat-value green" id="s-notifs"><div class="spinner"></div></div>
+          <div class="stat-icon">🔔</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">🩸 Blood Group Availability</div>
+          <div class="bg-chart" id="bg-chart">
+            <div class="spinner"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">⚠️ Expiring Soon (≤7 days)</div>
+          <div class="table-wrap" id="expiring-table">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="full-col card">
+        <div class="card-title">📊 Stock Levels by Bank</div>
+        <div class="stock-heat" id="stock-heat">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DONORS ───────────────────────────────────────────────── -->
+    <div class="page" id="page-donors">
+      <div class="section-header">
+        <div class="section-title">DONOR REGISTRY</div>
+        <div class="section-line"></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-donor')">+ Register Donor</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Name</th><th>Age</th><th>Blood Group</th>
+              <th>Last Donation</th><th>Contact</th><th>Tier</th><th>Points</th><th>Donations</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="donors-tbody"><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DONATIONS ────────────────────────────────────────────── -->
+    <div class="page" id="page-donations">
+      <div class="section-header">
+        <div class="section-title">DONATION RECORDS</div>
+        <div class="section-line"></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-donation')">+ Record Donation</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Donor</th><th>Blood Group</th><th>Bank</th><th>Date</th>
+            </tr></thead>
+            <tbody id="donations-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BLOOD UNITS ───────────────────────────────────────────── -->
+    <div class="page" id="page-blood-units">
+      <div class="section-header">
+        <div class="section-title">BLOOD UNIT INVENTORY</div>
+        <div class="section-line"></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="form-select" style="width:140px" id="filter-status" onchange="loadBloodUnits()">
+            <option value="">All Status</option>
+            <option value="Available">Available</option>
+            <option value="Used">Used</option>
+            <option value="Expired">Expired</option>
+          </select>
+          <select class="form-select" style="width:120px" id="filter-bg" onchange="loadBloodUnits()">
+            <option value="">All Groups</option>
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Unit ID</th><th>Blood Group</th><th>Bank</th><th>Status</th>
+              <th>Expiry Date</th><th>Days Left</th>
+            </tr></thead>
+            <tbody id="units-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── REQUESTS ──────────────────────────────────────────────── -->
+    <div class="page" id="page-requests">
+      <div class="section-header">
+        <div class="section-title">BLOOD REQUESTS</div>
+        <div class="section-line"></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-request')">+ New Request</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Hospital</th><th>Blood Group</th><th>Units</th>
+              <th>Status</th><th>Priority</th><th>Date</th>
+            </tr></thead>
+            <tbody id="requests-tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── BANKS ──────────────────────────────────────────────────── -->
+    <div class="page" id="page-banks">
+      <div class="section-header">
+        <div class="section-title">BLOOD BANKS</div>
+        <div class="section-line"></div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Name</th><th>Location</th><th>Available Units</th><th>Staff</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="banks-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── HOSPITALS ──────────────────────────────────────────────── -->
+    <div class="page" id="page-hospitals">
+      <div class="section-header">
+        <div class="section-title">HOSPITALS</div>
+        <div class="section-line"></div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Name</th><th>Location</th><th>Total Requests</th><th>Pending</th>
+            </tr></thead>
+            <tbody id="hospitals-tbody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STAFF ──────────────────────────────────────────────────── -->
+    <div class="page" id="page-staff">
+      <div class="section-header">
+        <div class="section-title">STAFF DIRECTORY</div>
+        <div class="section-line"></div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Name</th><th>Role</th><th>Bank</th>
+            </tr></thead>
+            <tbody id="staff-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PROCEDURES ─────────────────────────────────────────────── -->
+    <div class="page" id="page-procedures">
+      <div class="section-header">
+        <div class="section-title">STORED PROCEDURES</div>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="three-col">
+        <!-- Emergency Request -->
+        <div class="card">
+          <div class="card-title">🚨 Process Emergency Request</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Location</label>
+              <select class="form-select" id="p-emg-loc">
+                <option value="1">Delhi</option><option value="2">Mumbai</option>
+                <option value="3">Chennai</option><option value="4">Kolkata</option><option value="5">Pune</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Blood Group</label>
+              <select class="form-select" id="p-emg-bg">
+                <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Priority</label>
+              <select class="form-select" id="p-emg-priority">
+                <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
+              </select>
+            </div>
+            <button class="btn btn-danger btn-full" onclick="proc_emergencyRequest()">🚨 DISPATCH EMERGENCY</button>
+          </div>
+        </div>
+
+        <!-- Redistribute -->
+        <div class="card">
+          <div class="card-title">🚚 Redistribute Stock</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Source Bank ID</label>
+              <input class="form-input" type="number" id="p-src-bank" min="1" max="10" value="1" placeholder="1-10"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Destination Bank ID</label>
+              <input class="form-input" type="number" id="p-dst-bank" min="1" max="10" value="2" placeholder="1-10"/>
+            </div>
+            <button class="btn btn-primary btn-full" onclick="proc_redistribute()">Transfer Unit →</button>
+          </div>
+        </div>
+
+        <!-- Expire Units -->
+        <div class="card">
+          <div class="card-title">🗑️ Auto-Expire Units</div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+            Runs the <code style="color:var(--crimson);font-family:var(--font-mono)">Auto_Remove_Expiring_Units()</code> procedure — marks all past-expiry Available units as Expired and logs the action.
+          </p>
+          <button class="btn btn-warn btn-full" onclick="proc_expireUnits()">⚡ Run Expiry Sweep</button>
+        </div>
+      </div>
+
+      <div class="three-col">
+        <!-- Reward Donor -->
+        <div class="card">
+          <div class="card-title">🏆 Reward Donor</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Donor ID</label>
+              <input class="form-input" type="number" id="p-reward-donor" min="1" value="1" placeholder="Enter donor ID"/>
+            </div>
+            <button class="btn btn-primary btn-full" onclick="proc_rewardDonor()">🎖️ Award Points</button>
+          </div>
+          <div id="reward-result" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- Donation Drive -->
+        <div class="card">
+          <div class="card-title">📢 Schedule Donation Drive</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Blood Group</label>
+              <select class="form-select" id="p-drive-bg">
+                <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+              </select>
+            </div>
+            <button class="btn btn-outline btn-full" onclick="proc_donationDrive()">📋 Check & Schedule</button>
+          </div>
+        </div>
+
+        <!-- Compatibility Checker -->
+        <div class="card">
+          <div class="card-title">🧬 Compatibility Checker</div>
+          <div class="form-grid">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Donor Group</label>
+                <select class="form-select" id="compat-donor">
+                  <option>O-</option><option>O+</option><option>A-</option><option>A+</option>
+                  <option>B-</option><option>B+</option><option>AB-</option><option>AB+</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Recipient Group</label>
+                <select class="form-select" id="compat-recip">
+                  <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                  <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-outline btn-full" onclick="checkCompat()">🔬 Check</button>
+            <div id="compat-result" style="margin-top:4px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── COMPATIBILITY ──────────────────────────────────────────── -->
+    <div class="page" id="page-compatibility">
+      <div class="section-header">
+        <div class="section-title">COMPATIBILITY MATRIX</div>
+        <div class="section-line"></div>
+      </div>
+      <div class="card">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Rows = Donor Blood Group · Columns = Recipient Blood Group · ✓ = Compatible</p>
+        <div class="compat-matrix" id="compat-matrix">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TRANSPORT ───────────────────────────────────────────────── -->
+    <div class="page" id="page-transport">
+      <div class="section-header">
+        <div class="section-title">TRANSPORT LOG</div>
+        <div class="section-line"></div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Unit ID</th><th>Blood Group</th><th>Source Bank</th>
+              <th>Destination</th><th>Status</th>
+            </tr></thead>
+            <tbody id="transport-tbody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EMERGENCY ───────────────────────────────────────────────── -->
+    <div class="page" id="page-emergency">
+      <div class="section-header">
+        <div class="section-title">EMERGENCY REQUESTS</div>
+        <div class="section-line"></div>
+        <button class="btn btn-danger btn-sm" onclick="goto('procedures')">+ New Emergency</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>ID</th><th>Blood Group</th><th>Location</th><th>Priority</th>
+            </tr></thead>
+            <tbody id="emergency-tbody"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TEMPERATURE ─────────────────────────────────────────────── -->
+    <div class="page" id="page-temperature">
+      <div class="section-header">
+        <div class="section-title">TEMPERATURE MONITORING</div>
+        <div class="section-line"></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('modal-add-temp')">+ Log Reading</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Log ID</th><th>Unit ID</th><th>Blood Group</th><th>Bank</th>
+              <th>Temperature (°C)</th><th>Status</th><th>Recorded At</th>
+            </tr></thead>
+            <tbody id="temp-tbody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── NOTIFICATIONS ───────────────────────────────────────────── -->
+    <div class="page" id="page-notifications">
+      <div class="section-header">
+        <div class="section-title">NOTIFICATION LOG</div>
+        <div class="section-line"></div>
+      </div>
+      <div class="card">
+        <div id="notif-list">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ══ MODALS ══════════════════════════════════════════════════════════════════ -->
+
+<!-- Add Donor -->
+<div class="modal-overlay" id="modal-add-donor">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">REGISTER DONOR</div>
+      <button class="modal-close" onclick="closeModal('modal-add-donor')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input class="form-input" id="d-name" placeholder="Arjun Sharma"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Age (≥18)</label>
+          <input class="form-input" type="number" id="d-age" min="18" placeholder="25"/>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Blood Group</label>
+          <select class="form-select" id="d-bg">
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contact Number</label>
+          <input class="form-input" id="d-contact" placeholder="9000000001"/>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="addDonor()">🩸 Register Donor</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Donation -->
+<div class="modal-overlay" id="modal-add-donation">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">RECORD DONATION</div>
+      <button class="modal-close" onclick="closeModal('modal-add-donation')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Donor ID</label>
+        <input class="form-input" type="number" id="don-donor" min="1" placeholder="e.g. 1"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Blood Bank</label>
+        <select class="form-select" id="don-bank">
+          <option value="1">1 - Lifeline Blood Centre (Delhi)</option>
+          <option value="2">2 - Aarogya Blood Bank (Mumbai)</option>
+          <option value="3">3 - Surya BloodCare (Chennai)</option>
+          <option value="4">4 - Calcutta Haemobank (Kolkata)</option>
+          <option value="5">5 - Sahyadri Blood Store (Pune)</option>
+          <option value="6">6 - Deccan Blood Services (Hyderabad)</option>
+          <option value="7">7 - Garden City Bloodbank (Bangalore)</option>
+          <option value="8">8 - Pink City Blood Centre (Jaipur)</option>
+          <option value="9">9 - Gomti Haematology Unit (Lucknow)</option>
+          <option value="10">10 - Coastal Blood Hub (Goa)</option>
+        </select>
+      </div>
+      <p style="font-size:12px;color:var(--muted);line-height:1.5">
+        ⚡ DB trigger <code style="color:var(--crimson)">after_donation_insert</code> will automatically create a Blood Unit with 42-day expiry.
+      </p>
+      <button class="btn btn-primary btn-full" onclick="addDonation()">💉 Record Donation</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Request -->
+<div class="modal-overlay" id="modal-add-request">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">NEW BLOOD REQUEST</div>
+      <button class="modal-close" onclick="closeModal('modal-add-request')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Hospital</label>
+        <select class="form-select" id="req-hospital">
+          <option value="1">1 - AIIMS Delhi</option>
+          <option value="2">2 - Kokilaben Dhirubhai Ambani Hospital</option>
+          <option value="3">3 - Apollo Hospitals Chennai</option>
+          <option value="4">4 - Fortis Kolkata</option>
+          <option value="5">5 - Ruby Hall Clinic (Pune)</option>
+          <option value="6">6 - Yashoda Hospitals (Hyderabad)</option>
+          <option value="7">7 - Manipal Hospital Bangalore</option>
+          <option value="8">8 - SMS Medical College (Jaipur)</option>
+          <option value="9">9 - KGMU Lucknow</option>
+          <option value="10">10 - Goa Medical College</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Blood Group</label>
+          <select class="form-select" id="req-bg">
+            <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+            <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Units Required</label>
+          <input class="form-input" type="number" id="req-units" min="1" value="1"/>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--muted);line-height:1.5">
+        ⚡ Triggers <code style="color:var(--crimson)">before_request_insert</code> (sets status) and <code style="color:var(--crimson)">after_request_insert</code> (allocates units FEFO) fire automatically.
+      </p>
+      <button class="btn btn-primary btn-full" onclick="addRequest()">📋 Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bank Stock Modal -->
+<div class="modal-overlay" id="modal-bank-stock">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="bank-stock-title">BANK STOCK</div>
+      <button class="modal-close" onclick="closeModal('modal-bank-stock')">✕</button>
+    </div>
+    <div id="bank-stock-content"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- Donor Profile Modal -->
+<div class="modal-overlay" id="modal-donor-profile">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">DONOR PROFILE</div>
+      <button class="modal-close" onclick="closeModal('modal-donor-profile')">✕</button>
+    </div>
+    <div id="donor-profile-content"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- Add Temperature Log -->
+<div class="modal-overlay" id="modal-add-temp">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">LOG TEMPERATURE</div>
+      <button class="modal-close" onclick="closeModal('modal-add-temp')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Unit ID</label>
+          <input class="form-input" type="number" id="temp-unit" min="1" value="1"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Temperature (°C)</label>
+          <input class="form-input" type="number" id="temp-val" step="0.1" value="4.2" placeholder="2-6 safe range"/>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--muted)">Safe range: 2–6°C. Auto-alert fires via NOTIFICATION_LOG if out of range.</p>
+      <button class="btn btn-primary btn-full" onclick="addTempLog()">🌡️ Log Reading</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOAST CONTAINER ══════════════════════════════════════════════════════════ -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ══ SCRIPTS ══════════════════════════════════════════════════════════════════ -->
+<script>
+const API = 'http://localhost:3001/api';
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+const pageTitles = {
+  dashboard:'DASHBOARD', donors:'DONOR REGISTRY', donations:'DONATIONS',
+  'blood-units':'BLOOD UNIT INVENTORY', requests:'BLOOD REQUESTS',
+  banks:'BLOOD BANKS', hospitals:'HOSPITALS', staff:'STAFF DIRECTORY',
+  procedures:'STORED PROCEDURES', compatibility:'COMPATIBILITY MATRIX',
+  transport:'TRANSPORT LOG', emergency:'EMERGENCY REQUESTS',
+  temperature:'TEMPERATURE MONITORING', notifications:'NOTIFICATIONS'
+};
+
+function goto(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page)?.classList.add('active');
+  document.querySelector(`.nav-item[onclick="goto('${page}')"]`)?.classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[page] || page.toUpperCase();
+  loadPage(page);
+}
+
+function loadPage(page) {
+  const loaders = {
+    dashboard: loadDashboard,
+    donors: loadDonors,
+    donations: loadDonations,
+    'blood-units': loadBloodUnits,
+    requests: loadRequests,
+    banks: loadBanks,
+    hospitals: loadHospitals,
+    staff: loadStaff,
+    compatibility: loadCompatMatrix,
+    transport: loadTransport,
+    emergency: loadEmergency,
+    temperature: loadTemperature,
+    notifications: loadNotifications
+  };
+  loaders[page]?.();
+}
+
+// ── API helpers ─────────────────────────────────────────────────────────────
+async function apiFetch(path, opts={}) {
+  try {
+    const r = await fetch(API + path, opts);
+    if (!r.ok) { const e = await r.json(); throw new Error(e.error || r.statusText); }
+    return r.json();
+  } catch(e) {
+    if (e.message.includes('fetch')) throw new Error('Cannot connect to server. Make sure the backend is running on port 3001.');
+    throw e;
+  }
+}
+
+// ── Toast ───────────────────────────────────────────────────────────────────
+function toast(msg, type='info') {
+  const icons = { success:'✅', error:'❌', warn:'⚠️', info:'ℹ️' };
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<span class="toast-icon">${icons[type]||'ℹ️'}</span><div class="toast-msg">${msg}</div><button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
+  document.getElementById('toast-container').prepend(t);
+  setTimeout(() => t.remove(), 5000);
+}
+
+// ── Modals ──────────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+// ── Blood group badge ────────────────────────────────────────────────────────
+function bgBadge(bg) {
+  const type = bg.startsWith('AB') ? 'AB' : bg[0];
+  return `<span class="bg-badge bg-${type}">${bg}</span>`;
+}
+
+function statusBadge(s) {
+  return `<span class="badge badge-${s.toLowerCase()}">${s}</span>`;
+}
+
+function tierBadge(tier) {
+  const map = { 'Lifesaver':'lifesaver','Hero Donor':'hero','Regular Donor':'regular','New Donor':'new','No Donations':'none' };
+  const cls = map[tier] || 'none';
+  return `<span class="tier tier-${cls}">${tier}</span>`;
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const stats = await apiFetch('/stats');
+    document.getElementById('s-donors').textContent = stats.donors;
+    document.getElementById('s-units').textContent = stats.availableUnits;
+    document.getElementById('s-requests').textContent = stats.totalRequests;
+    document.getElementById('s-pending').textContent = stats.pendingRequests;
+    document.getElementById('s-hospitals').textContent = stats.hospitals;
+    document.getElementById('s-banks').textContent = stats.banks;
+    document.getElementById('s-expired').textContent = stats.expiredUnits;
+    document.getElementById('s-notifs').textContent = stats.notifications;
+    // Update notification badges
+    document.getElementById('notif-badge').textContent = stats.notifications;
+    document.getElementById('notif-top').textContent = stats.notifications;
+  } catch(e) { toast(e.message, 'error'); }
+
+  try {
+    const bgData = await apiFetch('/stats/blood-groups');
+    const max = Math.max(...bgData.map(r => r.count), 1);
+    const colors = { 'A+':'#ff6b6b','A-':'#ff4444','B+':'#4ecdc4','B-':'#2ebdbb','O+':'#f9ca24','O-':'#f0a800','AB+':'#a29bfe','AB-':'#7c6fff' };
+    document.getElementById('bg-chart').innerHTML = bgData.map(r => `
+      <div class="bg-row">
+        <div class="bg-label">${r.blood_group}</div>
+        <div class="bg-bar-wrap">
+          <div class="bg-bar" style="width:${Math.round(r.count/max*100)}%;background:${colors[r.blood_group]||'var(--crimson)'}"></div>
+        </div>
+        <div class="bg-count">${r.count}</div>
+      </div>`).join('');
+  } catch(e) { document.getElementById('bg-chart').innerHTML = '<div class="empty">No data</div>'; }
+
+  try {
+    const expiring = await apiFetch('/blood-units/expiring-soon');
+    const tbody = expiring.length ? `<table><thead><tr><th>Unit</th><th>Group</th><th>Bank</th><th>Days</th></tr></thead><tbody>` +
+      expiring.map(u => {
+        const d = u.days_to_expiry;
+        const color = d <= 2 ? 'var(--danger)' : d <= 5 ? 'var(--warn)' : 'var(--safe)';
+        return `<tr><td class="mono">#${u.unit_id}</td><td>${bgBadge(u.blood_group)}</td><td style="font-size:11px">${u.bank_name}</td><td style="color:${color};font-family:var(--font-mono);font-weight:600">${d}d</td></tr>`;
+      }).join('') + '</tbody></table>' : '<div class="empty"><div class="empty-icon">✅</div>No units expiring within 7 days</div>';
+    document.getElementById('expiring-table').innerHTML = tbody;
+  } catch(e) {}
+
+  try {
+    const stocks = await apiFetch('/stats/stock-levels');
+    const banks = {};
+    stocks.forEach(r => {
+      if (!banks[r.bank_name]) banks[r.bank_name] = {};
+      banks[r.bank_name][r.blood_group] = r.level;
+    });
+    const groups = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+    document.getElementById('stock-heat').innerHTML = Object.entries(banks).map(([bank, grps]) => `
+      <div class="stock-row">
+        <div class="stock-bank" title="${bank}">${bank}</div>
+        <div class="stock-groups">
+          ${groups.map(g => `<div class="stock-chip stock-${grps[g]||'CRITICAL'}" title="${g}: ${grps[g]||'CRITICAL'}">${g}</div>`).join('')}
+        </div>
+      </div>`).join('');
+  } catch(e) {}
+}
+
+// ── Donors ───────────────────────────────────────────────────────────────────
+async function loadDonors() {
+  try {
+    const donors = await apiFetch('/donors');
+    document.getElementById('donors-tbody').innerHTML = donors.map(d => `
+      <tr>
+        <td class="mono">${d.donor_id}</td>
+        <td><strong>${d.name}</strong></td>
+        <td>${d.age}</td>
+        <td>${bgBadge(d.blood_group)}</td>
+        <td class="mono">${d.last_donation_date ? d.last_donation_date.slice(0,10) : '—'}</td>
+        <td class="mono">${d.contact || '—'}</td>
+        <td>${tierBadge(d.tier)}</td>
+        <td><span style="color:var(--warn);font-family:var(--font-mono)">${d.reward_points} pts</span></td>
+        <td class="mono">${d.total_donations}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm" onclick="viewDonor(${d.donor_id})">👁 View</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function viewDonor(id) {
+  openModal('modal-donor-profile');
+  document.getElementById('donor-profile-content').innerHTML = '<div class="spinner"></div>';
+  try {
+    const d = await apiFetch(`/donors/${id}`);
+    document.getElementById('donor-profile-content').innerHTML = `
+      <div style="display:grid;gap:12px;margin-bottom:20px">
+        <div style="display:flex;gap:16px;align-items:center">
+          <div style="width:56px;height:56px;border-radius:50%;background:var(--red-mute);border:2px solid var(--crimson);display:flex;align-items:center;justify-content:center;font-size:24px">🧑</div>
+          <div>
+            <div style="font-family:var(--font-head);font-size:20px">${d.name}</div>
+            <div style="display:flex;gap:8px;margin-top:4px">${bgBadge(d.blood_group)} ${tierBadge(d.tier)}</div>
+          </div>
+          <div style="margin-left:auto;text-align:right">
+            <div style="font-family:var(--font-head);font-size:32px;color:var(--warn)">${d.reward_points}</div>
+            <div style="font-size:10px;color:var(--muted);letter-spacing:1px">REWARD PTS</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+          <div><span style="color:var(--muted)">Age: </span>${d.age}</div>
+          <div><span style="color:var(--muted)">Contact: </span>${d.contact||'—'}</div>
+          <div><span style="color:var(--muted)">Last Donation: </span>${d.last_donation_date?.slice(0,10)||'—'}</div>
+          <div><span style="color:var(--muted)">Total Donations: </span>${d.donations.length}</div>
+        </div>
+      </div>
+      <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Donation History</div>
+      ${d.donations.length ? `<table><thead><tr><th>ID</th><th>Bank</th><th>Date</th></tr></thead><tbody>
+        ${d.donations.map(don => `<tr><td class="mono">${don.donation_id}</td><td>${don.bank_name}</td><td class="mono">${don.donation_date.slice(0,10)}</td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty">No donations yet</div>'}`;
+  } catch(e) { document.getElementById('donor-profile-content').innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+async function addDonor() {
+  const name = document.getElementById('d-name').value.trim();
+  const age = parseInt(document.getElementById('d-age').value);
+  const blood_group = document.getElementById('d-bg').value;
+  const contact = document.getElementById('d-contact').value.trim();
+  if (!name || !age || !blood_group) return toast('Fill all required fields','warn');
+  try {
+    const r = await apiFetch('/donors', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name,age,blood_group,contact}) });
+    toast(r.message, 'success');
+    closeModal('modal-add-donor');
+    loadDonors();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Donations ────────────────────────────────────────────────────────────────
+async function loadDonations() {
+  try {
+    const data = await apiFetch('/donations');
+    document.getElementById('donations-tbody').innerHTML = data.map(d => `
+      <tr>
+        <td class="mono">${d.donation_id}</td>
+        <td>${d.donor_name}</td>
+        <td>${bgBadge(d.blood_group)}</td>
+        <td>${d.bank_name}</td>
+        <td class="mono">${d.donation_date.slice(0,10)}</td>
+      </tr>`).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function addDonation() {
+  const donor_id = parseInt(document.getElementById('don-donor').value);
+  const bank_id = parseInt(document.getElementById('don-bank').value);
+  if (!donor_id) return toast('Enter donor ID','warn');
+  try {
+    const r = await apiFetch('/donations', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({donor_id,bank_id}) });
+    toast(r.message,'success');
+    closeModal('modal-add-donation');
+    loadDonations();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Blood Units ──────────────────────────────────────────────────────────────
+async function loadBloodUnits() {
+  const status = document.getElementById('filter-status')?.value || '';
+  const blood_group = document.getElementById('filter-bg')?.value || '';
+  let qs = '?';
+  if (status) qs += `status=${status}&`;
+  if (blood_group) qs += `blood_group=${blood_group}&`;
+  try {
+    const data = await apiFetch('/blood-units' + qs);
+    document.getElementById('units-tbody').innerHTML = data.map(u => {
+      const d = u.days_to_expiry;
+      const daysColor = u.status === 'Available' ? (d <= 2 ? 'var(--danger)' : d <= 7 ? 'var(--warn)' : 'var(--safe)') : 'var(--muted)';
+      return `<tr>
+        <td class="mono">#${u.unit_id}</td>
+        <td>${bgBadge(u.blood_group)}</td>
+        <td style="font-size:12px">${u.bank_name}</td>
+        <td>${statusBadge(u.status)}</td>
+        <td class="mono">${u.expiry_date.slice(0,10)}</td>
+        <td style="color:${daysColor};font-family:var(--font-mono);font-weight:600">${d !== null ? d + 'd' : '—'}</td>
+      </tr>`;}).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Requests ─────────────────────────────────────────────────────────────────
+async function loadRequests() {
+  try {
+    const data = await apiFetch('/requests');
+    document.getElementById('requests-tbody').innerHTML = data.map(r => {
+      const pClass = r.priority === 'Emergency' ? 'priority-emergency' : r.priority === 'Urgent' ? 'priority-urgent' : 'priority-normal';
+      return `<tr>
+        <td class="mono">${r.request_id}</td>
+        <td>${r.hospital_name}</td>
+        <td>${bgBadge(r.blood_group)}</td>
+        <td class="mono">${r.units_required}</td>
+        <td>${statusBadge(r.status)}</td>
+        <td class="${pClass}" style="font-size:12px;font-weight:600">${r.priority}</td>
+        <td class="mono">${r.request_date.slice(0,10)}</td>
+      </tr>`;}).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function addRequest() {
+  const hospital_id = parseInt(document.getElementById('req-hospital').value);
+  const blood_group = document.getElementById('req-bg').value;
+  const units_required = parseInt(document.getElementById('req-units').value);
+  if (!units_required || units_required < 1) return toast('Units must be ≥ 1','warn');
+  try {
+    const r = await apiFetch('/requests', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({hospital_id,blood_group,units_required}) });
+    const type = r.request.status === 'Completed' ? 'success' : 'warn';
+    toast(`Request #${r.request.request_id}: ${r.message}`, type);
+    closeModal('modal-add-request');
+    loadRequests();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Banks ─────────────────────────────────────────────────────────────────────
+async function loadBanks() {
+  try {
+    const data = await apiFetch('/banks');
+    document.getElementById('banks-tbody').innerHTML = data.map(b => `
+      <tr>
+        <td class="mono">${b.bank_id}</td>
+        <td><strong>${b.name}</strong></td>
+        <td>${b.location}</td>
+        <td><span style="font-family:var(--font-mono);color:var(--crimson)">${b.available_units}</span></td>
+        <td class="mono">${b.staff_count}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="viewBankStock(${b.bank_id},'${b.name}')">📊 Stock</button></td>
+      </tr>`).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function viewBankStock(id, name) {
+  openModal('modal-bank-stock');
+  document.getElementById('bank-stock-title').textContent = name.toUpperCase() + ' STOCK';
+  document.getElementById('bank-stock-content').innerHTML = '<div class="spinner"></div>';
+  try {
+    const data = await apiFetch(`/banks/${id}/stock`);
+    document.getElementById('bank-stock-content').innerHTML = `
+      <table><thead><tr><th>Blood Group</th><th>Available</th><th>Used</th><th>Expired</th><th>Level</th></tr></thead>
+      <tbody>${data.map(r => `
+        <tr>
+          <td>${bgBadge(r.blood_group)}</td>
+          <td class="mono" style="color:var(--safe)">${r.available}</td>
+          <td class="mono" style="color:var(--info)">${r.used}</td>
+          <td class="mono" style="color:var(--danger)">${r.expired}</td>
+          <td><span class="badge badge-${r.stock_level.toLowerCase()}">${r.stock_level}</span></td>
+        </tr>`).join('')}
+      </tbody></table>`;
+  } catch(e) { document.getElementById('bank-stock-content').innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ── Hospitals ─────────────────────────────────────────────────────────────────
+async function loadHospitals() {
+  try {
+    const data = await apiFetch('/hospitals');
+    document.getElementById('hospitals-tbody').innerHTML = data.map(h => `
+      <tr>
+        <td class="mono">${h.hospital_id}</td>
+        <td><strong>${h.name}</strong></td>
+        <td>${h.location}</td>
+        <td class="mono">${h.total_requests}</td>
+        <td><span style="color:var(--warn);font-family:var(--font-mono)">${h.pending_requests}</span></td>
+      </tr>`).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Staff ─────────────────────────────────────────────────────────────────────
+async function loadStaff() {
+  try {
+    const data = await apiFetch('/staff');
+    document.getElementById('staff-tbody').innerHTML = data.map(s => `
+      <tr>
+        <td class="mono">${s.staff_id}</td>
+        <td><strong>${s.name}</strong></td>
+        <td><span class="badge badge-available" style="font-size:11px">${s.role_name}</span></td>
+        <td>${s.bank_name || '—'}</td>
+      </tr>`).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Procedures ────────────────────────────────────────────────────────────────
+async function proc_emergencyRequest() {
+  const location_id = parseInt(document.getElementById('p-emg-loc').value);
+  const blood_group = document.getElementById('p-emg-bg').value;
+  const priority_level = document.getElementById('p-emg-priority').value;
+  try {
+    const r = await apiFetch('/procedures/emergency-request', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({location_id,blood_group,priority_level}) });
+    const type = r.message.includes('Critical') ? 'error' : r.message.includes('Low') ? 'warn' : 'success';
+    toast(`🚨 ${r.message}`, type);
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function proc_redistribute() {
+  const source_bank = parseInt(document.getElementById('p-src-bank').value);
+  const destination_bank = parseInt(document.getElementById('p-dst-bank').value);
+  try {
+    const r = await apiFetch('/procedures/redistribute', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({source_bank,destination_bank}) });
+    const type = r.message.includes('transferred') ? 'success' : 'warn';
+    toast(r.message, type);
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function proc_expireUnits() {
+  try {
+    const r = await apiFetch('/procedures/expire-units', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    toast(r.message, r.message.includes('No ') ? 'info' : 'success');
+    loadDashboard();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function proc_rewardDonor() {
+  const donor_id = parseInt(document.getElementById('p-reward-donor').value);
+  if (!donor_id) return toast('Enter donor ID','warn');
+  try {
+    const r = await apiFetch('/procedures/reward-donor', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({donor_id}) });
+    toast(r.message, 'success');
+    if (r.reward) {
+      document.getElementById('reward-result').innerHTML = `<div class="reward-meter"><span style="font-size:18px">🏆</span><div><div style="font-size:11px;color:var(--muted);letter-spacing:1px">TOTAL BALANCE</div><div class="reward-pts">${r.reward.points} pts</div></div></div>`;
+    }
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function proc_donationDrive() {
+  const blood_group = document.getElementById('p-drive-bg').value;
+  try {
+    const r = await apiFetch('/procedures/donation-drive', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({blood_group}) });
+    const type = r.message.includes('recommended') ? 'warn' : 'success';
+    toast(r.message, type);
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function checkCompat() {
+  const donor = document.getElementById('compat-donor').value;
+  const recipient = document.getElementById('compat-recip').value;
+  try {
+    const r = await apiFetch(`/compatibility?donor=${donor}&recipient=${recipient}`);
+    const isCompat = r.result === 'Compatible';
+    document.getElementById('compat-result').innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:6px;background:${isCompat?'rgba(0,201,122,.1)':'rgba(232,0,63,.1)'};border:1px solid ${isCompat?'rgba(0,201,122,.2)':'rgba(232,0,63,.2)'}">
+        <span style="font-size:22px">${isCompat?'✅':'❌'}</span>
+        <div>
+          <div style="font-weight:600;color:${isCompat?'var(--safe)':'var(--danger)'}">${donor} → ${recipient}: ${r.result}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${r.availableCompatibleUnits} compatible units available</div>
+        </div>
+      </div>`;
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Compatibility Matrix ──────────────────────────────────────────────────────
+async function loadCompatMatrix() {
+  try {
+    const data = await apiFetch('/compatibility/matrix');
+    const groups = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+    const set = new Set(data.map(r => `${r.donor_group}|${r.recipient_group}`));
+    let html = `<table class="compat-table"><thead><tr><th></th>${groups.map(g=>`<th>${g}</th>`).join('')}</tr></thead><tbody>`;
+    groups.forEach(donor => {
+      html += `<tr><th>${donor}</th>${groups.map(recip => {
+        const ok = set.has(`${donor}|${recip}`);
+        return `<td class="${ok?'compat-cell-yes':'compat-cell-no'}">${ok?'✓':'·'}</td>`;
+      }).join('')}</tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('compat-matrix').innerHTML = html;
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Transport ─────────────────────────────────────────────────────────────────
+async function loadTransport() {
+  try {
+    const data = await apiFetch('/transport');
+    document.getElementById('transport-tbody').innerHTML = data.length ? data.map(t => `
+      <tr>
+        <td class="mono">${t.transport_id}</td>
+        <td class="mono">#${t.unit_id}</td>
+        <td>${bgBadge(t.blood_group)}</td>
+        <td>${t.source_bank_name}</td>
+        <td style="font-size:12px">${t.destination}</td>
+        <td><span class="badge badge-${t.status.toLowerCase().replace(' ','-')}">${t.status}</span></td>
+      </tr>`).join('') : '<tr><td colspan="6" class="empty">No transport records</td></tr>';
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Emergency ─────────────────────────────────────────────────────────────────
+async function loadEmergency() {
+  try {
+    const data = await apiFetch('/emergency-requests');
+    document.getElementById('emergency-tbody').innerHTML = data.length ? data.map(e => `
+      <tr>
+        <td class="mono">${e.req_id}</td>
+        <td>${bgBadge(e.blood_group)}</td>
+        <td>${e.city || '—'}</td>
+        <td><span class="priority-badge p-${e.priority_level}">${e.priority_level}</span></td>
+      </tr>`).join('') : '<tr><td colspan="4" class="empty">No emergency requests</td></tr>';
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Temperature ───────────────────────────────────────────────────────────────
+async function loadTemperature() {
+  try {
+    const data = await apiFetch('/temperature-logs');
+    document.getElementById('temp-tbody').innerHTML = data.map(t => {
+      const safe = t.temperature >= 2 && t.temperature <= 6;
+      return `<tr>
+        <td class="mono">${t.log_id}</td>
+        <td class="mono">#${t.unit_id}</td>
+        <td>${bgBadge(t.blood_group)}</td>
+        <td style="font-size:12px">${t.bank_name}</td>
+        <td style="font-family:var(--font-mono);font-weight:600;color:${safe?'var(--safe)':'var(--danger)'}">${t.temperature}°C</td>
+        <td>${safe ? '<span class="badge badge-safe">Safe</span>' : '<span class="badge badge-critical">⚠ Alert</span>'}</td>
+        <td class="mono" style="font-size:11px">${new Date(t.recorded_at).toLocaleString()}</td>
+      </tr>`;}).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function addTempLog() {
+  const unit_id = parseInt(document.getElementById('temp-unit').value);
+  const temperature = parseFloat(document.getElementById('temp-val').value);
+  if (!unit_id || isNaN(temperature)) return toast('Fill all fields','warn');
+  try {
+    const r = await apiFetch('/temperature-logs', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({unit_id,temperature}) });
+    toast(`Temperature logged for Unit #${unit_id}`, 'success');
+    if (r.alert) toast(r.alert, 'error');
+    closeModal('modal-add-temp');
+    loadTemperature();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+async function loadNotifications() {
+  try {
+    const data = await apiFetch('/notifications');
+    document.getElementById('notif-badge').textContent = data.length;
+    document.getElementById('notif-top').textContent = data.length;
+    document.getElementById('notif-list').innerHTML = data.length ? data.map(n => `
+      <div class="notif-item">
+        <div class="notif-dot"></div>
+        <div class="notif-msg">${n.message}</div>
+        <div class="notif-time">${new Date(n.created_at).toLocaleString()}</div>
+      </div>`).join('') : '<div class="empty"><div class="empty-icon">🔔</div>No notifications</div>';
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── DB Health Check ───────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const h = await apiFetch('/health');
+    document.getElementById('db-dot').className = 'db-dot';
+    document.getElementById('db-status-text').textContent = 'DB Connected';
+  } catch(e) {
+    document.getElementById('db-dot').className = 'db-dot err';
+    document.getElementById('db-status-text').textContent = 'DB Offline';
+  }
+}
+
+// ── Auto Refresh ──────────────────────────────────────────────────────────────
+let autoRefreshInterval = null;
+let autoRefreshOn = false;
+
+function toggleAutoRefresh() {
+  autoRefreshOn = !autoRefreshOn;
+  const btn = document.getElementById('auto-refresh-btn');
+  const icon = document.getElementById('ar-icon');
+  if (autoRefreshOn) {
+    btn.classList.add('on');
+    icon.textContent = '▶';
+    autoRefreshInterval = setInterval(() => {
+      const active = document.querySelector('.page.active')?.id?.replace('page-','');
+      if (active) loadPage(active);
+      checkHealth();
+    }, 5000);
+    toast('Auto-refresh enabled (5s)', 'info');
+  } else {
+    btn.classList.remove('on');
+    icon.textContent = '⏸';
+    clearInterval(autoRefreshInterval);
+    toast('Auto-refresh paused', 'info');
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+checkHealth();
+setInterval(checkHealth, 15000);
+loadDashboard();
+</script>
+</body>
+</html>
