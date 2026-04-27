@@ -1,22 +1,4 @@
--- ══════════════════════════════════════════════════════════════
---  BloodBank.io — FIXED & COMPLETE Database Setup
---  Fixes applied:
---    1. after_request_insert: now marks correct # of units Used (not just 1)
---    2. before_request_insert: now excludes expired units from availability
---    3. after_request_insert: now excludes expired units when selecting units
---    4. after_request_insert: now filters by hospital's region (bank proximity)
---    5. fn_Critical_Stock_Level: removed DETERMINISTIC (uses CURDATE())
---    6. fn_Days_To_Expiry: removed DETERMINISTIC (uses CURDATE())
---    7. COMPATIBILITY table: now populated and used by fn_Is_Compatible()
---    8. Auto_Remove_Expiring_Units: uses ROW_COUNT() to avoid race condition
---    9. blood_group: ENUM constraint enforced on all tables
---   10. REQUEST.status: DEFAULT 'Pending' added
---   11. BLOOD_UNIT: blood_group column added for direct queries
---   12. Redistribute_Stock_Between_Banks: logs consistent provenance
---   13. STAFF + TEMPERATURE_LOG: sample data added
---   14. DONOR_LOCATION: sample data added
---  Run: mysql -u root -p < bloodbank_fixed.sql
--- ══════════════════════════════════════════════════════════════
+
 
 DROP DATABASE IF EXISTS BloodBankDB;
 CREATE DATABASE BloodBankDB;
