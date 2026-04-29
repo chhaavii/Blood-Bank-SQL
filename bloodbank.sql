@@ -7,11 +7,7 @@ USE BloodBankDB;
 SET SQL_SAFE_UPDATES    = 0;
 SET FOREIGN_KEY_CHECKS  = 0;
 
--- ══════════════════════════════════════════════════════════════
---  TABLES
--- ══════════════════════════════════════════════════════════════
 
--- FIX #9: blood_group is now ENUM everywhere — invalid values rejected at DB level
 CREATE TABLE IF NOT EXISTS DONOR (
     donor_id           INT AUTO_INCREMENT PRIMARY KEY,
     name               VARCHAR(100) NOT NULL,
@@ -36,7 +32,7 @@ CREATE TABLE IF NOT EXISTS DONATION (
     FOREIGN KEY (bank_id)  REFERENCES BLOOD_BANK(bank_id)
 );
 
--- FIX #11: blood_group added directly to BLOOD_UNIT — eliminates 3-table join
+
 CREATE TABLE IF NOT EXISTS BLOOD_UNIT (
     unit_id     INT AUTO_INCREMENT PRIMARY KEY,
     donation_id INT NOT NULL,
@@ -54,7 +50,7 @@ CREATE TABLE IF NOT EXISTS HOSPITAL (
     location    VARCHAR(100)
 );
 
--- FIX #10: status has a DEFAULT so rows created outside triggers are valid
+
 CREATE TABLE IF NOT EXISTS REQUEST (
     request_id     INT AUTO_INCREMENT PRIMARY KEY,
     hospital_id    INT NOT NULL,
@@ -105,8 +101,6 @@ CREATE TABLE IF NOT EXISTS DONOR_REWARD (
     points   INT DEFAULT 0,
     FOREIGN KEY (donor_id) REFERENCES DONOR(donor_id)
 );
-
--- FIX #7: COMPATIBILITY now populated — used as source of truth
 CREATE TABLE IF NOT EXISTS COMPATIBILITY (
     donor_group     ENUM('A+','A-','B+','B-','O+','O-','AB+','AB-') NOT NULL,
     recipient_group ENUM('A+','A-','B+','B-','O+','O-','AB+','AB-') NOT NULL,
@@ -168,7 +162,6 @@ INSERT INTO COMPATIBILITY (donor_group, recipient_group) VALUES
 
 DELIMITER $$
 
--- FIX #11: Pull blood_group from DONOR and store directly in BLOOD_UNIT
 CREATE TRIGGER after_donation_insert
 AFTER INSERT ON DONATION
 FOR EACH ROW
@@ -185,7 +178,6 @@ BEGIN
     );
 END$$
 
--- FIX #2: Exclude expired units from availability count
 CREATE TRIGGER before_request_insert
 BEFORE INSERT ON REQUEST
 FOR EACH ROW
@@ -206,7 +198,7 @@ BEGIN
     END IF;
 END$$
 
--- FIX #1 & #3: Mark correct NUMBER of units as Used; exclude expired; use loop
+
 CREATE TRIGGER after_request_insert
 AFTER INSERT ON REQUEST
 FOR EACH ROW
@@ -218,11 +210,11 @@ BEGIN
     IF NEW.status = 'Completed' THEN
         SET v_remaining = NEW.units_required;
 
-        -- Loop: mark exactly units_required units as Used (FIX #1)
+
         WHILE v_remaining > 0 DO
             SET v_unit_id = NULL;
 
-            -- FIX #3: Only pick non-expired units
+          
             SELECT unit_id INTO v_unit_id
             FROM BLOOD_UNIT
             WHERE blood_group = NEW.blood_group
@@ -282,7 +274,7 @@ BEGIN
     END IF;
 END$$
 
--- FIX #12: Provenance consistency — transfer logs source donation context
+--Provenance consistency — transfer logs source donation context
 CREATE PROCEDURE Redistribute_Stock_Between_Banks(
     IN p_source_bank      INT,
     IN p_destination_bank INT
@@ -333,7 +325,7 @@ BEGIN
     END IF;
 END$$
 
--- FIX #8: Uses ROW_COUNT() after UPDATE to avoid COUNT/UPDATE race condition
+--  Uses ROW_COUNT() after UPDATE to avoid COUNT/UPDATE race condition
 CREATE PROCEDURE Auto_Remove_Expiring_Units()
 BEGIN
     DECLARE v_expired_count INT DEFAULT 0;
@@ -355,7 +347,7 @@ BEGIN
     END IF;
 END$$
 
--- FIX #(Reward): Points now accumulate — adds increment rather than flat reset
+-- (Reward): Points now accumulate — adds increment rather than flat reset
 CREATE PROCEDURE Reward_Active_Donor(IN p_donor_id INT)
 BEGIN
     DECLARE v_count    INT DEFAULT 0;
@@ -410,7 +402,7 @@ DELIMITER ;
 
 DELIMITER $$
 
--- FIX #6: NOT DETERMINISTIC — calls CURDATE()
+--  NOT DETERMINISTIC — calls CURDATE()
 CREATE FUNCTION fn_Days_To_Expiry(p_unit_id INT)
 RETURNS INT
 NOT DETERMINISTIC
@@ -422,7 +414,7 @@ BEGIN
     RETURN v_days;
 END$$
 
--- FIX #7: Now queries COMPATIBILITY table instead of duplicating logic
+--  Now queries COMPATIBILITY table instead of duplicating logic
 CREATE FUNCTION fn_Is_Compatible(
     p_donor_group     VARCHAR(5),
     p_recipient_group VARCHAR(5)
@@ -440,7 +432,7 @@ BEGIN
     END IF;
 END$$
 
--- FIX #5: NOT DETERMINISTIC — calls CURDATE() and reads live BLOOD_UNIT data
+--  NOT DETERMINISTIC — calls CURDATE() and reads live BLOOD_UNIT data
 CREATE FUNCTION fn_Critical_Stock_Level(p_bank_id INT, p_blood_group VARCHAR(5))
 RETURNS VARCHAR(20)
 NOT DETERMINISTIC
@@ -552,7 +544,7 @@ INSERT INTO DONOR (name, age, blood_group, last_donation_date, contact) VALUES
 ('Tarun Khanna',26,'A-','2025-02-07','9000000037'),('Priyanka Nambiar',27,'B-','2025-02-08','9000000038'),
 ('Sameer Saxena',28,'O-','2025-02-09','9000000039'),('Leela Krishnan',29,'AB-','2025-02-10','9000000040');
 
--- FIX #14: DONOR_LOCATION sample data
+--  DONOR_LOCATION sample data
 INSERT INTO DONOR_LOCATION (donor_id, location_id) VALUES
 (1,1),(2,2),(3,3),(4,4),(5,5),(6,1),(7,2),(8,3),(9,4),(10,5);
 
